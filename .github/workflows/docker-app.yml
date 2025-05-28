@@ -1,0 +1,36 @@
+name: Docker Build, Test and Push
+
+on:
+  push:
+    branches: ["tests", "main"]
+  pull_request:
+    branches: ["tests"]
+
+jobs:
+  docker-publish:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and run tests
+        if: runner.os == 'Linux'
+        run: docker-compose up --build --abort-on-container-exit
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker images
+        if: runner.os == 'Linux'
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-app:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-web:latest
