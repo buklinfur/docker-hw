@@ -12,6 +12,6 @@ RUN mkdir build && \
     cmake --build .
 
 FROM gcc:12.3.0
-COPY --from=builder /app/build/your_test_executable /app/
+COPY --from=builder /app/build/testproj /app/
 
-CMD ["/app/your_test_executable"]
+CMD ["/app/testproj"]
