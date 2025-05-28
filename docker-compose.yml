@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: ./candle-app
+      dockerfile: Dockerfile.app
+    container_name: candle-app-container
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.web
+    container_name: candle-web-container
+    depends_on:
+      app:
+        condition: service_completed_successfully
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
