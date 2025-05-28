@@ -21,7 +21,7 @@ jobs:
 
       - name: Install Docker Compose (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install docker-compose-plugin -y
+        run: sudo apt-get install docker-compose -y
 
       # Build and run tests
       - name: Build and run tests
