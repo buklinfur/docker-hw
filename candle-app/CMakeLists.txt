@@ -14,8 +14,8 @@ enable_testing()
 
 include_directories(.)
 
-add_executable(${PROJECT_NAME}  main.cpp
-                                candle.cpp)
+add_executable(${PROJECT_NAME}  src/main.cpp
+                                src/candle.cpp)
 
 target_link_libraries(${PROJECT_NAME} GTest::gtest_main)
 include(GoogleTest)
