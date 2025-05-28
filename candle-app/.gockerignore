@@ -1,5 +1,0 @@
-.git
-build/
-*.o
-*.a
-.vscode
