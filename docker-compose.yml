@@ -5,6 +5,7 @@ services:
       context: ./candle-app
       dockerfile: Dockerfile.app
     container_name: candle-app-container
+    image: buklinfur/candle-app:latest 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -13,6 +14,7 @@ services:
       context: ./web
       dockerfile: Dockerfile.web
     container_name: candle-web-container
+    image: buklinfur/candle-web:latest 
     depends_on:
       app:
         condition: service_completed_successfully
