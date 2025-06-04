@@ -64,9 +64,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose
 
+      - name: Tear down any leftover containers
+        run: |
+          docker compose down --volumes --remove-orphans || true
+
       - name: Build images via Compose
         run: |
           docker compose build
+
+      - name: Ensure no stale app container
+        run: |
+          docker rm candle-app-container 2>/dev/null || true
 
       - name: Run services in detached mode
         run: |
