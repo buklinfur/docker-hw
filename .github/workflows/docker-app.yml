@@ -85,6 +85,7 @@ jobs:
 
       - name: Smoke test - nginx returns PASSED
         run: |
+          sleep 5
           curl http://localhost | grep "PASSED"
 
       - name: Tear down
