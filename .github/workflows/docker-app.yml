@@ -8,7 +8,7 @@ on:
 
 env:
   BUILD_TYPE: Debug
-  APP_DIR: candle-app  # Define app directory
+  APP_DIR: candle-app
 
 jobs:
   build-and-test:
@@ -55,15 +55,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Install Docker Compose
-        run: sudo apt-get install docker-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
 
-      - name: Build and run containers
-        run: docker compose up --build --abort-on-container-exit
+      - name: Build images via Compose
+        run: |
+          docker compose build
+
+      - name: Run services in detached mode
+        run: |
+          docker compose up -d
+          while [ "$(docker inspect -f '{{.State.Running}}' candle-app-container 2>/dev/null)" == "true" ]; do
+            sleep 1
+          done
+
+      - name: Smoke test - nginx returns PASSED
+        run: |
+          curl http://localhost | grep "PASSED"
+
+      - name: Tear down
+        run: docker compose down
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -73,7 +90,6 @@ jobs:
 
       - name: Push Docker images
         run: |
-          docker tag candle-app-container ${{ secrets.DOCKERHUB_USERNAME }}/candle-app:latest
-          docker tag candle-web-container ${{ secrets.DOCKERHUB_USERNAME }}/candle-web:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-app:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-web:latest
+
