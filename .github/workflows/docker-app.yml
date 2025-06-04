@@ -2,9 +2,9 @@ name: Docker Build, Test and Push
 
 on:
   push:
-    branches: ["tests", "main"]
+    branches: ["docker-app", "main"]
   pull_request:
-    branches: ["tests"]
+    branches: ["docker-app"]
 
 env:
   BUILD_TYPE: Debug
