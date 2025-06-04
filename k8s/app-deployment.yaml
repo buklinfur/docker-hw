@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: candle-app-deployment
+  labels:
+    app: candle-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: candle-app
+  template:
+    metadata:
+      labels:
+        app: candle-app
+    spec:
+      containers:
+        - name: candle-app-container
+          image: buklinfur/candle-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Запускаем тест-приложение и сразу пишем вывод в общий том
+              mkdir -p /usr/share/nginx/html
+              /app/testproj > /usr/share/nginx/html/index.html 2>&1
+              # После завершения тестов не выходим, чтобы keep-alive для emptyDir
+              sleep infinity
+          volumeMounts:
+            - name: html-volume
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: html-volume
+          emptyDir: {}

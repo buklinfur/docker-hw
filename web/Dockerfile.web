@@ -1,0 +1,8 @@
+FROM nginx:latest
+
+# RUN apt-get update && apt-get install -y docker.io # Это в кубе может ломаться, оставляем чистое
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

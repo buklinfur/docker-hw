@@ -1,0 +1,129 @@
+name: Docker Build, Test and Push
+
+on:
+  push:
+    branches: ["k8s-app", "main"]
+  pull_request:
+    branches: ["k8s-app"]
+
+env:
+  BUILD_TYPE: Debug
+  APP_DIR: candle-app
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+            version: "13"
+          - os: windows-latest
+            compiler: gcc
+            version: "11.2.0"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-${{ matrix.version }} cmake
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install mingw --version=${{ matrix.version }} -y
+          choco install cmake -y
+
+      - name: Configure CMake
+        working-directory: ${{ env.APP_DIR }}
+        run: cmake -B build
+
+      - name: Build
+        working-directory: ${{ env.APP_DIR }}
+        run: cmake --build build
+
+      - name: Run tests with CTest
+        working-directory: ${{ env.APP_DIR }}/build
+        run: ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+
+  docker-publish:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Tear down any leftover containers
+        run: |
+          docker compose down --volumes --remove-orphans || true
+
+      - name: Build images via Compose
+        run: |
+          docker compose build
+
+      - name: Ensure no stale app container
+        run: |
+          docker rm candle-app-container 2>/dev/null || true
+
+      - name: Run services in detached mode
+        run: |
+          docker compose up -d
+          while [ "$(docker inspect -f '{{.State.Running}}' candle-app-container 2>/dev/null)" == "true" ]; do
+            sleep 1
+          done
+
+      - name: Smoke test - nginx returns PASSED
+        run: |
+          sleep 5
+          curl -s http://localhost | grep "PASSED"
+
+      - name: Tear down
+        run: docker compose down --volumes --remove-orphans
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker images
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-app:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-web:latest
+
+  deploy-to-k8s:
+    needs: docker-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure Kubeconfig
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f k8s/app-deployment.yaml
+          kubectl apply -f k8s/web-deployment.yaml
+          kubectl apply -f k8s/web-service.yaml
+
+      - name: Check rollout status
+        run: |
+          kubectl rollout status deployment/candle-app-deployment --timeout=60s
+          kubectl rollout status deployment/candle-web-deployment --timeout=60s

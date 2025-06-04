@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ./candle-app
+      dockerfile: Dockerfile.app
+    container_name: candle-app-container
+    image: buklinfur/candle-app:latest
+    command: >
+      /bin/sh -c "
+        mkdir -p /usr/share/nginx/html &&
+        /app/testproj > /usr/share/nginx/html/index.html 2>&1 &&
+        sleep infinity
+      "
+    volumes:
+      - html-volume:/usr/share/nginx/html
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.web
+    container_name: candle-web-container
+    image: buklinfur/candle-web:latest
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+    volumes:
+      - html-volume:/usr/share/nginx/html
+
+volumes:
+  html-volume:
