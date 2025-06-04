@@ -50,7 +50,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}/build
         run: ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
 
-  docker-publish:
+  docker-build-push:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
@@ -59,71 +59,63 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Install Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
-      - name: Tear down any leftover containers
-        run: |
-          docker compose down --volumes --remove-orphans || true
-
-      - name: Build images via Compose
-        run: |
-          docker compose build
-
-      - name: Ensure no stale app container
-        run: |
-          docker rm candle-app-container 2>/dev/null || true
-
-      - name: Run services in detached mode
-        run: |
-          docker compose up -d
-          while [ "$(docker inspect -f '{{.State.Running}}' candle-app-container 2>/dev/null)" == "true" ]; do
-            sleep 1
-          done
-
-      - name: Smoke test - nginx returns PASSED
-        run: |
-          sleep 5
-          curl -s http://localhost | grep "PASSED"
-
-      - name: Tear down
-        run: docker compose down --volumes --remove-orphans
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker images
+      - name: Build and Push candle-app
         run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/candle-app:latest -f ./candle-app/Dockerfile.app ./candle-app
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-app:latest
+
+      - name: Build and Push candle-web
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/candle-web:latest -f ./web/Dockerfile.web ./web
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/candle-web:latest
 
-  deploy-to-k8s:
-    needs: docker-publish
+  helm-deploy:
+    needs: docker-build-push
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.13.3
+
+      - name: Package Helm chart
+        run: |
+          helm package helm/test-repo-chart
+
+      - name: Create Git tag for Helm release
+        run: |
+          TAG="v$(date +'%Y%m%d%H%M%S')"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag $TAG
+          git push origin $TAG
+
+      - name: Publish Helm chart as GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: test-repo-chart-*.tgz
+          tag_name: ${{ env.TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: latest
 
       - name: Configure Kubeconfig
         run: |
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
 
-      - name: Deploy to Kubernetes
+      - name: Deploy chart with Helm
         run: |
-          kubectl apply -f k8s/app-deployment.yaml
-          kubectl apply -f k8s/web-deployment.yaml
-          kubectl apply -f k8s/web-service.yaml
-
-      - name: Check rollout status
-        run: |
-          kubectl rollout status deployment/candle-app-deployment --timeout=60s
-          kubectl rollout status deployment/candle-web-deployment --timeout=60s
+          helm upgrade --install candle-release ./helm/test-repo-chart --namespace default --wait
