@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: candle-web-service
+spec:
+  selector:
+    app: candle-web
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80

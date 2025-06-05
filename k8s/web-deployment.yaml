@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: candle-web-deployment
+  labels:
+    app: candle-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: candle-web
+  template:
+    metadata:
+      labels:
+        app: candle-web
+    spec:
+      containers:
+        - name: candle-web-container
+          image: buklinfur/candle-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Просто запускаем nginx, который отдаёт index.html из тома
+              nginx -g 'daemon off;'
+          volumeMounts:
+            - name: html-volume
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: html-volume
+          emptyDir: {}
