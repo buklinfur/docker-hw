@@ -22,10 +22,8 @@ spec:
             - /bin/sh
             - -c
             - |
-              # Запускаем тест-приложение и сразу пишем вывод в общий том
               mkdir -p /usr/share/nginx/html
               /app/testproj > /usr/share/nginx/html/index.html 2>&1
-              # После завершения тестов не выходим, чтобы keep-alive для emptyDir
               sleep infinity
           volumeMounts:
             - name: html-volume
