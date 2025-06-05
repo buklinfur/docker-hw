@@ -10,6 +10,9 @@ env:
   BUILD_TYPE: Debug
   APP_DIR: candle-app
 
+permissions:
+  contents: write
+
 jobs:
   build-and-test:
     strategy:
@@ -91,8 +94,6 @@ jobs:
           helm package helm/test-repo-chart
 
       - name: Create and push Git tag for Helm release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v$(date +'%Y%m%d%H%M%S')"
           echo "TAG=$TAG" >> $GITHUB_ENV
